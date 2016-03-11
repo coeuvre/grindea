@@ -1,0 +1,5 @@
+let g:coeuvre_project_root = g:localvimrc_script_dir
+
+let &makeprg = 'cd ' . g:coeuvre_project_root . ' && ./build.sh'
+
+nnoremap <silent> <leader>br :VimuxRunCommand('cd ' . g:coeuvre_project_root . g:coeuvre_shell_cmd_and . './run.sh')<cr>
