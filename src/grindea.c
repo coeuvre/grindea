@@ -36,6 +36,48 @@ typedef struct {
     HM_Sprite *idles[Direction_Count];
 } HeroSprites;
 
+typedef struct {
+    // Center point
+    HM_V2 pos;
+    HM_V2 size;
+} Camera;
+
+static Camera
+camera_pos_size(HM_V2 pos, HM_V2 size) {
+    Camera result = { pos, size };
+
+    return result;
+}
+
+typedef struct {
+} World;
+
+static HM_Transform2
+pixel_space_to_world_space(f32 pixels_to_meters) {
+    HM_Transform2 result = hm_transform2_scale(hm_v2(pixels_to_meters, pixels_to_meters));
+
+    return result;
+}
+
+static HM_Transform2
+world_space_to_camera_space(Camera *camera) {
+    HM_Transform2 result = hm_transform2_translation(hm_v2_neg(camera->pos));
+
+    return result;
+}
+
+static HM_Transform2
+camera_space_to_screen_space(Camera *camera, i32 minx, i32 maxx, i32 miny, i32 maxy) {
+    HM_V2 inv_size = hm_v2(1.0f / camera->size.width,
+                           1.0f / camera->size.height);
+    HM_Transform2 result = hm_transform2_scale(inv_size);
+    result = hm_transform2_translate_by(hm_v2(0.5f, 0.5f), result);
+    result = hm_transform2_scale_by(hm_v2(maxx - minx, maxy - miny), result);
+    result = hm_transform2_translate_by(hm_v2(minx, miny), result);
+
+    return result;
+}
+
 static HeroSprites
 load_hero_sprites(HM_GameMemory *memory) {
     HeroSprites result;
@@ -77,9 +119,19 @@ static HM_INIT_GAME(init_game) {
 }
 
 static HM_UPDATE_AND_RENDER(update_and_render) {
-    f32 dt = input->dt;
+    HM_DEBUG_BEGIN_BLOCK("update_and_render");
 
     GameState *gamestate = memory->perm.base;
+    f32 dt = input->dt;
+
+    gamestate->time += dt;
+
+    f32 meters_to_pixels = 48.0f;
+    f32 pixels_to_meters = 1.0f / meters_to_pixels;
+
+    f32 aspect_ratio = (f32)framebuffer->width / (f32)framebuffer->height;
+    f32 camera_height = 12.0;
+    Camera camera = camera_pos_size(hm_v2(0, 0), hm_v2(aspect_ratio * camera_height, camera_height));
 
     if (input->keyboard.keys[HM_Key_W].is_down) {
         gamestate->hero_direction = Direction_Up;
@@ -97,42 +149,23 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
         gamestate->hero_direction = Direction_Right;
     }
 
-    gamestate->time += dt;
-
-    HM_V2 screen_center = hm_v2(framebuffer->width / 2.0f, framebuffer->height / 2.0f);
-
-    /*gamestate->camera_pos = hm_v2(input->mouse.x, WINDOW_HEIGHT - input->mouse.y);*/
+    //
+    // Render
+    //
+    HM_Transform2 world_to_screen_transform =
+        hm_transform2_dot(camera_space_to_screen_space(&camera, 0, framebuffer->width, 0, framebuffer->height),
+                          world_space_to_camera_space(&camera));
 
     hm_clear_texture(framebuffer, hm_v4(0.5f, 0.5f, 0.5f, 0));
 
-    /*for (int i = 0; i < 10; ++i)*/
     {
-        /*HM_V2 hero_pos_in_camera_space = hm_v2_sub(gamestate->hero_pos, gamestate->camera_pos);*/
-
-        HM_Transform2 transform = hm_transform2_identity();
-        /*transform = hm_transform2_rotate_by(transform, gamestate->time);*/
-        /*transform = hm_transform2_scale_by(transform, hm_v2(2, 2));*/
-        /*transform = hm_transform2_translate_by(transform, hm_v2(input->mouse.x, WINDOW_HEIGHT - input->mouse.y));*/
-        /*transform = hm_transform2_translate_by(transform, hero_pos_in_camera_space);*/
-
-        transform = hm_transform2_translate_by(transform, screen_center);
-        HM_Sprite *frame = gamestate->hero_sprites.idles[gamestate->hero_direction];
-        /*frame = gamestate->hero_walk_down_anim;*/
-        hm_draw_sprite(framebuffer, transform, frame, hm_v4(1, 1, 1, 1));
-        /*hm_draw_bitmap(framebuffer, transform, &gamestate->hero_walk_down_texture, hm_v4(1, 1, 1, 1));*/
-
+        HM_Transform2 transform = pixel_space_to_world_space(pixels_to_meters);
+        transform = hm_transform2_translate_by(hm_v2(1, 1), transform);
+        transform = hm_transform2_dot(world_to_screen_transform, transform);
+        hm_draw_sprite(framebuffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
     }
 
-#if 0
-    {
-        HM_Transform2 transform = hm_transform2_identity();
-        transform = hm_transform2_translate_by(transform, hm_v2(-50, -50));
-        transform = hm_transform2_rotate_by(transform, gamestate->time);
-        transform = hm_transform2_translate_by(transform, hm_v2(300, 300));
-
-        hm_draw_bbox2(framebuffer, transform, hm_bbox2(hm_v2(0, 0), hm_v2(100, 100)), hm_v4(1, 0, 0, 1));
-    }
-#endif
+    HM_DEBUG_END_BLOCK("update_and_render");
 }
 
 int main(void) {

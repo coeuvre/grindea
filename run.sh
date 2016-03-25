@@ -1,3 +1,5 @@
 #!/bin/sh
 
-./build.sh && clear && ./build/grindea
+cd `dirname $0`
+
+clear && ./build.sh && ./build/grindea

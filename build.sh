@@ -1,20 +1,15 @@
 #!/bin/sh
 
-cc=clang
-src=`pwd`/src/grindea.c
+cd `dirname $0`
+base=`pwd`
 
-clear
+cc=clang
+cflags="-W -Wall -g -std=c99 -DHM_DEBUG"
+src=$base/src/grindea.c
 
 [ ! -d "build" ] && mkdir build
 
-pushd build
+cd build
 
-$cc -W -Wall -g -std=c11 $src -c -o grindea.o
-$cc -lSDL2 -lhammer grindea.o -o grindea
-
-success=$?
-
-popd
-
-exit $success
+$cc $cflags $src -lhammer -lm -lSDL2 -o grindea
 
