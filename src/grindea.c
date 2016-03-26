@@ -2,6 +2,8 @@
 
 #define WINDOW_WIDTH 960
 #define WINDOW_HEIGHT 540
+#define METERS_TO_PIXELS 48.0f
+#define PIXELS_TO_METERS (1.0f / METERS_TO_PIXELS)
 
 #if 0
 typedef enum {
@@ -79,7 +81,7 @@ camera_space_to_screen_space(Camera *camera, i32 minx, i32 maxx, i32 miny, i32 m
 }
 
 static HeroSprites
-load_hero_sprites(HM_GameMemory *memory) {
+load_hero_sprites(HM_Memory *memory) {
     HeroSprites result;
 
     result.idle_texture = hm_load_bitmap(&memory->perm, "assets/sprites/hero/idle.bmp");
@@ -111,6 +113,8 @@ typedef struct {
 } GameState;
 
 static HM_INIT_GAME(init_game) {
+    HM_Memory *memory = hammer->memory;
+
     GameState *gamestate = HM_PUSH_STRUCT(&memory->perm, GameState);
 
     gamestate->test_texture = hm_load_bitmap(&memory->perm, "assets/test.bmp");
@@ -119,13 +123,17 @@ static HM_INIT_GAME(init_game) {
 
     gamestate->hero_pos = hm_v2_zero();
 
-    f32 aspect_ratio = (f32)WINDOW_WIDTH / (f32)WINDOW_HEIGHT;
-    f32 camera_height = 12.0f;
+    f32 aspect_ratio = (f32)hammer->framebuffer->width / (f32)hammer->framebuffer->height;
+    f32 camera_height = hammer->framebuffer->height * PIXELS_TO_METERS;
     gamestate->camera = camera_pos_size(hm_v2_zero(), hm_v2(aspect_ratio * camera_height, camera_height));
 }
 
 static HM_UPDATE_AND_RENDER(update_and_render) {
     HM_DEBUG_BEGIN_BLOCK("update_and_render");
+
+    HM_Memory *memory = hammer->memory;
+    HM_Input *input = hammer->input;
+    HM_Texture2 *framebuffer = hammer->framebuffer;
 
     GameState *gamestate = memory->perm.base;
     f32 dt = input->dt;
@@ -166,8 +174,6 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
     //
     // Render
     //
-    f32 meters_to_pixels = 48.0f;
-    f32 pixels_to_meters = 1.0f / meters_to_pixels;
     HM_Transform2 world_to_screen_transform = hm_transform2_dot(
         camera_space_to_screen_space(&gamestate->camera, 0, framebuffer->width, 0, framebuffer->height),
         world_space_to_camera_space(&gamestate->camera)
@@ -176,7 +182,7 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
     hm_clear_texture(framebuffer, hm_v4(0.5f, 0.5f, 0.5f, 0));
 
     {
-        HM_Transform2 transform = pixel_space_to_world_space(pixels_to_meters);
+        HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
         transform = hm_transform2_translate_by(hm_v2(1, 1), transform);
         transform = hm_transform2_dot(world_to_screen_transform, transform);
         hm_draw_sprite(framebuffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
