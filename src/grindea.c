@@ -99,23 +99,29 @@ load_hero_sprites(HM_GameMemory *memory) {
 typedef struct {
     f32 time;
 
+    HM_Texture2 *test_texture;
+
     HeroSprites hero_sprites;
     Direction hero_direction;
 
     HM_V2 camera_pos;
     HM_V2 hero_pos;
-} GameState;
 
-static void
-init_game_state(HM_GameMemory *memory, GameState *gamestate) {
-    gamestate->hero_sprites = load_hero_sprites(memory);
-    gamestate->camera_pos = hm_v2(WINDOW_WIDTH / 2.0f, WINDOW_HEIGHT / 2.0f);
-    gamestate->hero_pos = hm_v2(WINDOW_WIDTH / 2.0f, WINDOW_HEIGHT / 2.0f);
-}
+    Camera camera;
+} GameState;
 
 static HM_INIT_GAME(init_game) {
     GameState *gamestate = HM_PUSH_STRUCT(&memory->perm, GameState);
-    init_game_state(memory, gamestate);
+
+    gamestate->test_texture = hm_load_bitmap(&memory->perm, "assets/test.bmp");
+
+    gamestate->hero_sprites = load_hero_sprites(memory);
+
+    gamestate->hero_pos = hm_v2_zero();
+
+    f32 aspect_ratio = (f32)WINDOW_WIDTH / (f32)WINDOW_HEIGHT;
+    f32 camera_height = 12.0f;
+    gamestate->camera = camera_pos_size(hm_v2_zero(), hm_v2(aspect_ratio * camera_height, camera_height));
 }
 
 static HM_UPDATE_AND_RENDER(update_and_render) {
@@ -126,35 +132,46 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
 
     gamestate->time += dt;
 
-    f32 meters_to_pixels = 48.0f;
-    f32 pixels_to_meters = 1.0f / meters_to_pixels;
-
     f32 aspect_ratio = (f32)framebuffer->width / (f32)framebuffer->height;
-    f32 camera_height = 12.0;
-    Camera camera = camera_pos_size(hm_v2(0, 0), hm_v2(aspect_ratio * camera_height, camera_height));
-
     if (input->keyboard.keys[HM_Key_W].is_down) {
         gamestate->hero_direction = Direction_Up;
+        gamestate->camera.pos.y += 0.1f;
     }
 
     if (input->keyboard.keys[HM_Key_S].is_down) {
         gamestate->hero_direction = Direction_Down;
+        gamestate->camera.pos.y -= 0.1f;
     }
 
     if (input->keyboard.keys[HM_Key_A].is_down) {
         gamestate->hero_direction = Direction_Left;
+        gamestate->camera.pos.x -= 0.1f;
     }
 
     if (input->keyboard.keys[HM_Key_D].is_down) {
         gamestate->hero_direction = Direction_Right;
+        gamestate->camera.pos.x += 0.1f;
+    }
+
+    if (input->keyboard.keys[HM_Key_UP].is_down) {
+        gamestate->camera.size.height *= 1.1f;
+        gamestate->camera.size.width = aspect_ratio * gamestate->camera.size.height;
+    }
+
+    if (input->keyboard.keys[HM_Key_DOWN].is_down) {
+        gamestate->camera.size.height *= 0.9f;
+        gamestate->camera.size.width = aspect_ratio * gamestate->camera.size.height;
     }
 
     //
     // Render
     //
-    HM_Transform2 world_to_screen_transform =
-        hm_transform2_dot(camera_space_to_screen_space(&camera, 0, framebuffer->width, 0, framebuffer->height),
-                          world_space_to_camera_space(&camera));
+    f32 meters_to_pixels = 48.0f;
+    f32 pixels_to_meters = 1.0f / meters_to_pixels;
+    HM_Transform2 world_to_screen_transform = hm_transform2_dot(
+        camera_space_to_screen_space(&gamestate->camera, 0, framebuffer->width, 0, framebuffer->height),
+        world_space_to_camera_space(&gamestate->camera)
+    );
 
     hm_clear_texture(framebuffer, hm_v4(0.5f, 0.5f, 0.5f, 0));
 
@@ -164,6 +181,15 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
         transform = hm_transform2_dot(world_to_screen_transform, transform);
         hm_draw_sprite(framebuffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
     }
+
+#if 0
+    {
+        HM_Transform2 transform = hm_transform2_identity();
+        transform = hm_transform2_scale_by(hm_v2(5, 5), transform);
+        transform = hm_transform2_translate_by(hm_v2(10, 10), transform);
+        hm_draw_bitmap(framebuffer, transform, gamestate->test_texture, hm_v4(1, 1, 1, 1));
+    }
+#endif
 
     HM_DEBUG_END_BLOCK("update_and_render");
 }
