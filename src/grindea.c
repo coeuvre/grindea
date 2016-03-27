@@ -142,22 +142,22 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
 
     f32 aspect_ratio = (f32)framebuffer->width / (f32)framebuffer->height;
     if (input->keyboard.keys[HM_Key_W].is_down) {
-        gamestate->hero_direction = Direction_Up;
+        /*gamestate->hero_direction = Direction_Up;*/
         gamestate->camera.pos.y += 0.1f;
     }
 
     if (input->keyboard.keys[HM_Key_S].is_down) {
-        gamestate->hero_direction = Direction_Down;
+        /*gamestate->hero_direction = Direction_Down;*/
         gamestate->camera.pos.y -= 0.1f;
     }
 
     if (input->keyboard.keys[HM_Key_A].is_down) {
-        gamestate->hero_direction = Direction_Left;
+        /*gamestate->hero_direction = Direction_Left;*/
         gamestate->camera.pos.x -= 0.1f;
     }
 
     if (input->keyboard.keys[HM_Key_D].is_down) {
-        gamestate->hero_direction = Direction_Right;
+        /*gamestate->hero_direction = Direction_Right;*/
         gamestate->camera.pos.x += 0.1f;
     }
 
