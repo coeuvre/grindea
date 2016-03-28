@@ -103,6 +103,8 @@ typedef struct {
 
     HM_Texture2 *test_texture;
 
+    HM_Texture2 *background;
+
     HeroSprites hero_sprites;
     Direction hero_direction;
 
@@ -118,6 +120,8 @@ static HM_INIT_GAME(init_game) {
     GameState *gamestate = HM_PUSH_STRUCT(&memory->perm, GameState);
 
     gamestate->test_texture = hm_load_bitmap(&memory->perm, "assets/test.bmp");
+
+    gamestate->background = hm_load_bitmap(&memory->perm, "assets/scene1.bmp");
 
     gamestate->hero_sprites = load_hero_sprites(memory);
 
@@ -183,6 +187,13 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
 
     {
         HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
+        transform = hm_transform2_dot(world_to_screen_transform, transform);
+        hm_draw_bitmap(framebuffer, transform, gamestate->background, hm_v4(1, 1, 1, 1));
+    }
+
+    {
+        HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
+        transform = hm_transform2_rotate_by(gamestate->time, transform);
         transform = hm_transform2_translate_by(hm_v2(1, 1), transform);
         transform = hm_transform2_dot(world_to_screen_transform, transform);
         hm_draw_sprite(framebuffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
@@ -190,9 +201,10 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
 
 #if 0
     {
-        HM_Transform2 transform = hm_transform2_identity();
-        transform = hm_transform2_scale_by(hm_v2(5, 5), transform);
+        HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
+        transform = hm_transform2_scale_by(hm_v2(4, 4), transform);
         transform = hm_transform2_translate_by(hm_v2(10, 10), transform);
+        transform = hm_transform2_dot(world_to_screen_transform, transform);
         hm_draw_bitmap(framebuffer, transform, gamestate->test_texture, hm_v4(1, 1, 1, 1));
     }
 #endif
