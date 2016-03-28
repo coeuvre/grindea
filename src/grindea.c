@@ -101,6 +101,8 @@ load_hero_sprites(HM_Memory *memory) {
 typedef struct {
     f32 time;
 
+    HM_RenderCommandBuffer *buffer;
+
     HM_Texture2 *test_texture;
 
     HM_Texture2 *background;
@@ -118,6 +120,8 @@ static HM_INIT_GAME(init_game) {
     HM_Memory *memory = hammer->memory;
 
     GameState *gamestate = HM_PUSH_STRUCT(&memory->perm, GameState);
+
+    gamestate->buffer = hm_make_render_command_buffer(&memory->tran, HM_MEMORY_SIZE_MB(1));
 
     gamestate->test_texture = hm_load_bitmap(&memory->perm, "assets/test.bmp");
 
@@ -139,7 +143,7 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
     HM_Input *input = hammer->input;
     HM_Texture2 *framebuffer = hammer->framebuffer;
 
-    GameState *gamestate = memory->perm.base;
+    GameState *gamestate = (GameState *)memory->perm.base;
     f32 dt = input->dt;
 
     gamestate->time += dt;
@@ -178,17 +182,17 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
     //
     // Render
     //
+    hm_clear_texture(framebuffer, hm_v4(0.5f, 0.5f, 0.5f, 0));
+
     HM_Transform2 world_to_screen_transform = hm_transform2_dot(
         camera_space_to_screen_space(&gamestate->camera, 0, framebuffer->width, 0, framebuffer->height),
         world_space_to_camera_space(&gamestate->camera)
     );
 
-    hm_clear_texture(framebuffer, hm_v4(0.5f, 0.5f, 0.5f, 0));
-
     {
         HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
         transform = hm_transform2_dot(world_to_screen_transform, transform);
-        hm_draw_bitmap(framebuffer, transform, gamestate->background, hm_v4(1, 1, 1, 1));
+        hm_render_bitmap(gamestate->buffer, transform, gamestate->background, hm_v4(1, 1, 1, 1));
     }
 
     {
@@ -196,8 +200,10 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
         transform = hm_transform2_rotate_by(gamestate->time, transform);
         transform = hm_transform2_translate_by(hm_v2(1, 1), transform);
         transform = hm_transform2_dot(world_to_screen_transform, transform);
-        hm_draw_sprite(framebuffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
+        hm_render_sprite(gamestate->buffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
     }
+
+    hm_present_render_commands(gamestate->buffer, framebuffer);
 
 #if 0
     {
