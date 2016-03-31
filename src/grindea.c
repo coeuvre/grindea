@@ -27,6 +27,20 @@ typedef struct {
 #endif
 
 typedef enum {
+    EntityType_None,
+    EntityType_Hero,
+} EntityType;
+
+typedef struct {
+    EntityType type;
+
+    HM_V2 pos;
+
+    HM_V2 vel;
+    HM_V2 acc;
+} Entity;
+
+typedef enum {
     Direction_Up = 0,
     Direction_Down,
     Direction_Left,
@@ -48,12 +62,37 @@ typedef struct {
 } GroundChunk;
 
 #define MAX_GROUND_CHUNK_COUNT 32
+#define MAX_ENTITY_COUNT 1024
 typedef struct {
     u32 ground_chunk_count;
     GroundChunk ground_chunks[MAX_GROUND_CHUNK_COUNT];
 
     HM_V2 ground_chunk_size;
+
+    u32 entity_count;
+    Entity entities[MAX_ENTITY_COUNT];
+
+    Entity *hero;
 } World;
+
+static Entity *
+add_entity(World *world, EntityType type) {
+    HM_ASSERT(world->entity_count < HM_ARRAY_COUNT(world->entities));
+
+    Entity *result = world->entities + world->entity_count++;
+    result->type = type;
+
+    return result;
+}
+
+static Entity *
+add_hero(World *world, HM_V2 pos) {
+    Entity *hero = add_entity(world, EntityType_Hero);
+
+    hero->pos = pos;
+
+    return hero;
+}
 
 static HeroSprites
 load_hero_sprites(HM_Memory *memory) {
@@ -125,6 +164,7 @@ static HM_INIT_GAME(init_game) {
              gamestate->background->height * PIXELS_TO_METERS)
     );
 
+    // Manually load ground chunks
     {
         i32 ground_width_in_pixels = gamestate->background->width;
         i32 ground_height_in_pixels = gamestate->background->height;
@@ -165,6 +205,8 @@ static HM_INIT_GAME(init_game) {
             }
         }
     }
+
+    gamestate->world.hero = add_hero(&gamestate->world, hm_v2_zero());
 }
 
 static HM_UPDATE_AND_RENDER(update_and_render) {
@@ -181,23 +223,23 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
 
     f32 aspect_ratio = (f32)framebuffer->width / (f32)framebuffer->height;
     if (input->keyboard.keys[HM_Key_W].is_down) {
-        /*gamestate->hero_direction = Direction_Up;*/
-        gamestate->camera.pos.y += 0.1f;
+        gamestate->hero_direction = Direction_Up;
+        gamestate->world.hero->pos.y += 0.1f;
     }
 
     if (input->keyboard.keys[HM_Key_S].is_down) {
-        /*gamestate->hero_direction = Direction_Down;*/
-        gamestate->camera.pos.y -= 0.1f;
+        gamestate->hero_direction = Direction_Down;
+        gamestate->world.hero->pos.y -= 0.1f;
     }
 
     if (input->keyboard.keys[HM_Key_A].is_down) {
-        /*gamestate->hero_direction = Direction_Left;*/
-        gamestate->camera.pos.x -= 0.1f;
+        gamestate->hero_direction = Direction_Left;
+        gamestate->world.hero->pos.x -= 0.1f;
     }
 
     if (input->keyboard.keys[HM_Key_D].is_down) {
-        /*gamestate->hero_direction = Direction_Right;*/
-        gamestate->camera.pos.x += 0.1f;
+        gamestate->hero_direction = Direction_Right;
+        gamestate->world.hero->pos.x += 0.1f;
     }
 
     if (input->keyboard.keys[HM_Key_UP].is_down) {
@@ -209,6 +251,8 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
         gamestate->camera.size.h *= 0.9f;
         gamestate->camera.size.w = aspect_ratio * gamestate->camera.size.h;
     }
+
+    gamestate->camera.pos = gamestate->world.hero->pos;
 
     // Limit camera in bounds
     {
@@ -344,7 +388,7 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
     {
         HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
         /*transform = hm_transform2_rotate_by(gamestate->time, transform);*/
-        transform = hm_transform2_translate_by(hm_v2(1, 1), transform);
+        transform = hm_transform2_translate_by(gamestate->world.hero->pos, transform);
         transform = hm_transform2_dot(world_to_screen_transform, transform);
         hm_render_sprite(gamestate->buffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
     }
