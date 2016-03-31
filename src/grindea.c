@@ -1,7 +1,9 @@
 #include "hammer/hammer.h"
 
-#define WINDOW_WIDTH 960
-#define WINDOW_HEIGHT 540
+#include "camera.c"
+
+#define WINDOW_WIDTH 967
+#define WINDOW_HEIGHT 547
 #define METERS_TO_PIXELS 48.0f
 #define PIXELS_TO_METERS (1.0f / METERS_TO_PIXELS)
 
@@ -39,46 +41,19 @@ typedef struct {
 } HeroSprites;
 
 typedef struct {
-    // Center point
-    HM_V2 pos;
-    HM_V2 size;
-} Camera;
+    HM_Sprite *sprite;
 
-static Camera
-camera_pos_size(HM_V2 pos, HM_V2 size) {
-    Camera result = { pos, size };
+    i32 x;
+    i32 y;
+} GroundChunk;
 
-    return result;
-}
-
+#define MAX_GROUND_CHUNK_COUNT 32
 typedef struct {
+    u32 ground_chunk_count;
+    GroundChunk ground_chunks[MAX_GROUND_CHUNK_COUNT];
+
+    HM_V2 ground_chunk_size;
 } World;
-
-static HM_Transform2
-pixel_space_to_world_space(f32 pixels_to_meters) {
-    HM_Transform2 result = hm_transform2_scale(hm_v2(pixels_to_meters, pixels_to_meters));
-
-    return result;
-}
-
-static HM_Transform2
-world_space_to_camera_space(Camera *camera) {
-    HM_Transform2 result = hm_transform2_translation(hm_v2_neg(camera->pos));
-
-    return result;
-}
-
-static HM_Transform2
-camera_space_to_screen_space(Camera *camera, i32 minx, i32 maxx, i32 miny, i32 maxy) {
-    HM_V2 inv_size = hm_v2(1.0f / camera->size.width,
-                           1.0f / camera->size.height);
-    HM_Transform2 result = hm_transform2_scale(inv_size);
-    result = hm_transform2_translate_by(hm_v2(0.5f, 0.5f), result);
-    result = hm_transform2_scale_by(hm_v2(maxx - minx, maxy - miny), result);
-    result = hm_transform2_translate_by(hm_v2(minx, miny), result);
-
-    return result;
-}
 
 static HeroSprites
 load_hero_sprites(HM_Memory *memory) {
@@ -114,6 +89,11 @@ typedef struct {
     HM_V2 hero_pos;
 
     Camera camera;
+
+    World world;
+
+    u32 loaded_ground_chunk_count;
+    GroundChunk *loaded_ground_chunks;
 } GameState;
 
 static HM_INIT_GAME(init_game) {
@@ -121,19 +101,64 @@ static HM_INIT_GAME(init_game) {
 
     GameState *gamestate = HM_PUSH_STRUCT(&memory->perm, GameState);
 
-    gamestate->buffer = hm_make_render_command_buffer(&memory->tran, HM_MEMORY_SIZE_MB(1));
+    gamestate->buffer = hm_make_render_command_buffer(&memory->tran,
+                                                      HM_MEMORY_SIZE_MB(1));
 
-    gamestate->test_texture = hm_load_bitmap(&memory->perm, "assets/test.bmp");
+    gamestate->test_texture = hm_load_bitmap(&memory->tran, "assets/test.bmp");
 
-    gamestate->background = hm_load_bitmap(&memory->perm, "assets/scene1.bmp");
+    gamestate->background = hm_load_bitmap(&memory->tran, "assets/scene1.bmp");
 
     gamestate->hero_sprites = load_hero_sprites(memory);
 
     gamestate->hero_pos = hm_v2_zero();
 
-    f32 aspect_ratio = (f32)hammer->framebuffer->width / (f32)hammer->framebuffer->height;
+    f32 aspect_ratio = (f32)hammer->framebuffer->width /
+                       (f32)hammer->framebuffer->height;
     f32 camera_height = hammer->framebuffer->height * PIXELS_TO_METERS;
-    gamestate->camera = camera_pos_size(hm_v2_zero(), hm_v2(aspect_ratio * camera_height, camera_height));
+    gamestate->camera = camera_pos_size(hm_v2_zero(),
+                                        hm_v2(aspect_ratio * camera_height,
+                                              camera_height));
+
+    {
+        i32 ground_width_in_pixels = gamestate->background->width;
+        i32 ground_height_in_pixels = gamestate->background->height;
+        i32 ground_chunk_count_x = 6;
+        i32 ground_chunk_count_y = 4;
+
+        f32 ground_chunk_width_in_pixels = (f32)ground_width_in_pixels /
+                                           (f32)ground_chunk_count_x;
+        f32 ground_chunk_height_in_pixels = (f32)ground_height_in_pixels /
+                                            (f32)ground_chunk_count_y;
+
+        gamestate->world.ground_chunk_size =
+            hm_v2(ground_chunk_width_in_pixels * PIXELS_TO_METERS,
+                  ground_chunk_height_in_pixels * PIXELS_TO_METERS);
+
+        gamestate->loaded_ground_chunk_count = ground_chunk_count_x *
+                                               ground_chunk_count_y;
+        gamestate->loaded_ground_chunks =
+            HM_PUSH_ARRAY(&memory->tran, GroundChunk,
+                          gamestate->loaded_ground_chunk_count);
+
+        for (i32 y = 0; y < ground_chunk_count_y; ++y) {
+            for (i32 x = 0; x < ground_chunk_count_x; ++x) {
+                i32 ground_chunk_index = y * ground_chunk_count_x + x;
+                GroundChunk *ground_chunk = gamestate->loaded_ground_chunks +
+                                            ground_chunk_index;
+
+                ground_chunk->x = x;
+                ground_chunk->y = y;
+                ground_chunk->sprite = hm_sprite_from_texture(
+                    &memory->tran, gamestate->background,
+                    hm_bbox2_min_size(hm_v2(x * ground_chunk_width_in_pixels,
+                                            y * ground_chunk_height_in_pixels),
+                                      hm_v2(ground_chunk_width_in_pixels,
+                                            ground_chunk_height_in_pixels)),
+                    hm_v2_zero()
+                );
+            }
+        }
+    }
 }
 
 static HM_UPDATE_AND_RENDER(update_and_render) {
@@ -170,13 +195,63 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
     }
 
     if (input->keyboard.keys[HM_Key_UP].is_down) {
-        gamestate->camera.size.height *= 1.1f;
-        gamestate->camera.size.width = aspect_ratio * gamestate->camera.size.height;
+        gamestate->camera.size.h *= 1.1f;
+        gamestate->camera.size.w = aspect_ratio * gamestate->camera.size.h;
     }
 
     if (input->keyboard.keys[HM_Key_DOWN].is_down) {
-        gamestate->camera.size.height *= 0.9f;
-        gamestate->camera.size.width = aspect_ratio * gamestate->camera.size.height;
+        gamestate->camera.size.h *= 0.9f;
+        gamestate->camera.size.w = aspect_ratio * gamestate->camera.size.h;
+    }
+
+    // update active ground chunks
+    {
+        World *world = &gamestate->world;
+
+        HM_BBox2 camera_bbox = hm_bbox2_cen_size(gamestate->camera.pos,
+                                                 gamestate->camera.size);
+        i32 min_x = hm_f32_floor(camera_bbox.min.x /
+                                 gamestate->world.ground_chunk_size.w);
+        i32 min_y = hm_f32_floor(camera_bbox.min.y /
+                                 gamestate->world.ground_chunk_size.h);
+        i32 max_x = hm_f32_ceil(camera_bbox.max.x /
+                                 gamestate->world.ground_chunk_size.w);
+        i32 max_y = hm_f32_ceil(camera_bbox.max.y /
+                                 gamestate->world.ground_chunk_size.h);
+
+        world->ground_chunk_count = 0;
+        for (i32 y = min_y; y <= max_y; ++y) {
+            for (i32 x = min_x; x <= max_x; ++x) {
+                if (world->ground_chunk_count < HM_ARRAY_COUNT(world->ground_chunks)) {
+                    GroundChunk *ground_chunk = world->ground_chunks +
+                                                world->ground_chunk_count;
+
+                    GroundChunk *found_ground_chunk = 0;
+
+                    // Find loaded ground chunk at (x, y)
+                    for (u32 loaded_ground_chunk_index = 0;
+                         loaded_ground_chunk_index <
+                         gamestate->loaded_ground_chunk_count;
+                         ++loaded_ground_chunk_index)
+                    {
+                        GroundChunk *loaded_ground_chunk =
+                            gamestate->loaded_ground_chunks + loaded_ground_chunk_index;
+
+                        if (loaded_ground_chunk->x == x &&
+                            loaded_ground_chunk->y == y)
+                        {
+                            found_ground_chunk = loaded_ground_chunk;
+                            break;
+                        }
+                    }
+
+                    if (found_ground_chunk) {
+                        *ground_chunk = *found_ground_chunk;
+                        ++world->ground_chunk_count;
+                    }
+                }
+            }
+        }
     }
 
     //
@@ -189,15 +264,52 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
         world_space_to_camera_space(&gamestate->camera)
     );
 
+    // Render ground chunk
+    {
+        World *world = &gamestate->world;
+
+        for (u32 ground_chunk_index = 0;
+             ground_chunk_index < world->ground_chunk_count;
+             ++ground_chunk_index)
+        {
+            GroundChunk *ground_chunk = world->ground_chunks + ground_chunk_index;
+            HM_V2 pos = hm_v2(ground_chunk->x * world->ground_chunk_size.w,
+                              ground_chunk->y * world->ground_chunk_size.h);
+
+            HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
+            transform = hm_transform2_translate_by(pos, transform);
+            transform = hm_transform2_dot(world_to_screen_transform, transform);
+            hm_render_sprite(gamestate->buffer, transform,
+                             ground_chunk->sprite, hm_v4(1, 1, 1, 1));
+
+            HM_BBox2 bbox = hm_bbox2_min_size(
+                hm_v2_zero(),
+                hm_get_bbox2_size(ground_chunk->sprite->bbox)
+            );
+
+#if 1
+            // Render ground chunk outline
+            {
+                HM_Transform2 inv_transform = hm_transform2_invert(transform);
+                f32 thickness = 2.0f * hm_get_transform2_scale(inv_transform).x;
+                hm_render_bbox2_outline(gamestate->buffer, transform,
+                                        bbox, thickness, hm_v4(1, 1, 1, 1));
+            }
+#endif
+        }
+    }
+
+#if 0
     {
         HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
         transform = hm_transform2_dot(world_to_screen_transform, transform);
         hm_render_bitmap(gamestate->buffer, transform, gamestate->background, hm_v4(1, 1, 1, 1));
     }
+#endif
 
     {
         HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
-        transform = hm_transform2_rotate_by(gamestate->time, transform);
+        /*transform = hm_transform2_rotate_by(gamestate->time, transform);*/
         transform = hm_transform2_translate_by(hm_v2(1, 1), transform);
         transform = hm_transform2_dot(world_to_screen_transform, transform);
         hm_render_sprite(gamestate->buffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
