@@ -89,6 +89,7 @@ typedef struct {
     HM_V2 hero_pos;
 
     Camera camera;
+    HM_BBox2 camera_bounds;
 
     World world;
 
@@ -115,9 +116,14 @@ static HM_INIT_GAME(init_game) {
     f32 aspect_ratio = (f32)hammer->framebuffer->width /
                        (f32)hammer->framebuffer->height;
     f32 camera_height = hammer->framebuffer->height * PIXELS_TO_METERS;
-    gamestate->camera = camera_pos_size(hm_v2_zero(),
-                                        hm_v2(aspect_ratio * camera_height,
-                                              camera_height));
+    HM_V2 camera_size = hm_v2(aspect_ratio * camera_height, camera_height);
+    gamestate->camera = camera_pos_size(hm_v2_zero(), camera_size);
+
+    gamestate->camera_bounds = hm_bbox2_min_size(
+        hm_v2_zero(),
+        hm_v2(gamestate->background->width * PIXELS_TO_METERS,
+             gamestate->background->height * PIXELS_TO_METERS)
+    );
 
     {
         i32 ground_width_in_pixels = gamestate->background->width;
@@ -204,6 +210,34 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
         gamestate->camera.size.w = aspect_ratio * gamestate->camera.size.h;
     }
 
+    // Limit camera in bounds
+    {
+        HM_BBox2 camera_bbox = hm_bbox2_cen_size(gamestate->camera.pos,
+                                                 gamestate->camera.size);
+
+        if (camera_bbox.min.x < gamestate->camera_bounds.min.x) {
+            camera_bbox.min.x = gamestate->camera_bounds.min.x;
+        }
+
+        if (camera_bbox.min.y < gamestate->camera_bounds.min.y) {
+            camera_bbox.min.y = gamestate->camera_bounds.min.y;
+        }
+
+        camera_bbox = hm_bbox2_min_size(camera_bbox.min, gamestate->camera.size);
+
+        if (camera_bbox.max.x > gamestate->camera_bounds.max.x) {
+            camera_bbox.max.x = gamestate->camera_bounds.max.x;
+        }
+
+        if (camera_bbox.max.y > gamestate->camera_bounds.max.y) {
+            camera_bbox.max.y = gamestate->camera_bounds.max.y;
+        }
+
+        camera_bbox = hm_bbox2_max_size(camera_bbox.max, gamestate->camera.size);
+
+        gamestate->camera.pos = hm_get_bbox2_cen(camera_bbox);
+    }
+
     // update active ground chunks
     {
         World *world = &gamestate->world;
@@ -257,7 +291,7 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
     //
     // Render
     //
-    hm_clear_texture(framebuffer, hm_v4(0.5f, 0.5f, 0.5f, 0));
+    //hm_clear_texture(framebuffer, hm_v4(0.5f, 0.5f, 0.5f, 0));
 
     HM_Transform2 world_to_screen_transform = hm_transform2_dot(
         camera_space_to_screen_space(&gamestate->camera, 0, framebuffer->width, 0, framebuffer->height),
