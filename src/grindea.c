@@ -6,6 +6,8 @@
 #define WINDOW_HEIGHT 547
 #define METERS_TO_PIXELS 48.0f
 #define PIXELS_TO_METERS (1.0f / METERS_TO_PIXELS)
+#define HERO_SPEED 150
+#define ENTITY_DRAG 20
 
 #if 0
 typedef enum {
@@ -209,6 +211,24 @@ static HM_INIT_GAME(init_game) {
     gamestate->world.hero = add_hero(&gamestate->world, hm_v2_zero());
 }
 
+static void
+move_entity(Entity *entity, f32 dt) {
+    HM_V2 drag = hm_v2_mul(ENTITY_DRAG, hm_v2_neg(entity->vel));
+
+    HM_V2 acc = hm_v2_add(drag, entity->acc);
+
+    // entity->vel * dt + 0.5f * acc * dt * dt;
+    HM_V2 movement = hm_v2_add(hm_v2_mul(dt, entity->vel),
+                               hm_v2_mul(0.5f * dt * dt, acc));
+
+    entity->vel = hm_v2_add(entity->vel, hm_v2_mul(dt, acc));
+    if (hm_get_v2_len_sq(entity->vel) < 0.01f) {
+        entity->vel = hm_v2_zero();
+    }
+
+    entity->pos = hm_v2_add(entity->pos, movement);
+}
+
 static HM_UPDATE_AND_RENDER(update_and_render) {
     HM_DEBUG_BEGIN_BLOCK("update_and_render");
 
@@ -221,27 +241,37 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
 
     gamestate->time += dt;
 
+    {
+        HM_V2 acc = hm_v2_zero();
+        if (input->keyboard.keys[HM_Key_W].is_down) {
+            gamestate->hero_direction = Direction_Up;
+            acc.y = 1.0f;
+        }
+
+        if (input->keyboard.keys[HM_Key_S].is_down) {
+            gamestate->hero_direction = Direction_Down;
+            acc.y = -1.0f;
+        }
+
+        if (input->keyboard.keys[HM_Key_A].is_down) {
+            gamestate->hero_direction = Direction_Left;
+            acc.x = -1.0f;
+        }
+
+        if (input->keyboard.keys[HM_Key_D].is_down) {
+            gamestate->hero_direction = Direction_Right;
+            acc.x = 1.0f;
+        }
+
+        acc = hm_v2_normalize(acc);
+        acc = hm_v2_mul(HERO_SPEED, acc);
+
+        gamestate->world.hero->acc = acc;
+    }
+
+    move_entity(gamestate->world.hero, dt);
+
     f32 aspect_ratio = (f32)framebuffer->width / (f32)framebuffer->height;
-    if (input->keyboard.keys[HM_Key_W].is_down) {
-        gamestate->hero_direction = Direction_Up;
-        gamestate->world.hero->pos.y += 0.1f;
-    }
-
-    if (input->keyboard.keys[HM_Key_S].is_down) {
-        gamestate->hero_direction = Direction_Down;
-        gamestate->world.hero->pos.y -= 0.1f;
-    }
-
-    if (input->keyboard.keys[HM_Key_A].is_down) {
-        gamestate->hero_direction = Direction_Left;
-        gamestate->world.hero->pos.x -= 0.1f;
-    }
-
-    if (input->keyboard.keys[HM_Key_D].is_down) {
-        gamestate->hero_direction = Direction_Right;
-        gamestate->world.hero->pos.x += 0.1f;
-    }
-
     if (input->keyboard.keys[HM_Key_UP].is_down) {
         gamestate->camera.size.h *= 1.1f;
         gamestate->camera.size.w = aspect_ratio * gamestate->camera.size.h;
@@ -252,6 +282,7 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
         gamestate->camera.size.w = aspect_ratio * gamestate->camera.size.h;
     }
 
+    // Update camera position based on hero
     gamestate->camera.pos = gamestate->world.hero->pos;
 
     // Limit camera in bounds
@@ -377,14 +408,6 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
         }
     }
 
-#if 0
-    {
-        HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
-        transform = hm_transform2_dot(world_to_screen_transform, transform);
-        hm_render_bitmap(gamestate->buffer, transform, gamestate->background, hm_v4(1, 1, 1, 1));
-    }
-#endif
-
     {
         HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
         /*transform = hm_transform2_rotate_by(gamestate->time, transform);*/
@@ -394,16 +417,6 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
     }
 
     hm_present_render_commands(gamestate->buffer, framebuffer);
-
-#if 0
-    {
-        HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
-        transform = hm_transform2_scale_by(hm_v2(4, 4), transform);
-        transform = hm_transform2_translate_by(hm_v2(10, 10), transform);
-        transform = hm_transform2_dot(world_to_screen_transform, transform);
-        hm_draw_bitmap(framebuffer, transform, gamestate->test_texture, hm_v4(1, 1, 1, 1));
-    }
-#endif
 
     HM_DEBUG_END_BLOCK("update_and_render");
 }
