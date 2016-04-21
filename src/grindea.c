@@ -8,6 +8,7 @@
 #define PIXELS_TO_METERS (1.0f / METERS_TO_PIXELS)
 #define HERO_SPEED 150
 #define ENTITY_DRAG 20
+#define PHYSICS_ITERATION_COUNT 4
 
 #if 0
 typedef enum {
@@ -144,8 +145,6 @@ load_hero_sprites(HM_Memory *memory) {
 typedef struct {
     f32 time;
 
-    HM_RenderCommandBuffer *buffer;
-
     HM_Texture2 *test_texture;
 
     HM_Texture2 *background;
@@ -169,9 +168,6 @@ static HM_INIT_GAME(init_game) {
     HM_Memory *memory = hammer->memory;
 
     GameState *gamestate = HM_PUSH_STRUCT(&memory->perm, GameState);
-
-    gamestate->buffer = hm_make_render_command_buffer(&memory->tran,
-                                                      HM_MEMORY_SIZE_MB(1));
 
     gamestate->test_texture = hm_load_bitmap(&memory->tran, "assets/test.bmp");
 
@@ -270,7 +266,10 @@ move_entity(World *world, Entity *entity, f32 dt) {
     }
 
     // TODO: More iterations to do collision dections
-    for (i32 i = 0; i < 4 && hm_get_v2_len_sq(movement) > 0.0f; ++i) {
+    for (i32 i = 0;
+         i < PHYSICS_ITERATION_COUNT && hm_get_v2_len_sq(movement) > 0.0f;
+         ++i)
+    {
         HM_V2 target = hm_v2_add(entity->pos, movement);
 
         f32 limit_t = 0.0f;
@@ -485,6 +484,11 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
         world_space_to_camera_space(&gamestate->camera)
     );
 
+    HM_MemoryArena *render_memory = hm_begin_tmp_memory(&memory->tran);
+    HM_RenderCommandBuffer *buffer =
+        hm_make_render_command_buffer(render_memory, HM_MEMORY_SIZE_MB(1));
+
+
     // Render ground chunk
     {
         World *world = &gamestate->world;
@@ -500,7 +504,7 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
             HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
             transform = hm_transform2_translate_by(pos, transform);
             transform = hm_transform2_dot(world_to_screen_transform, transform);
-            hm_render_sprite(gamestate->buffer, transform,
+            hm_render_sprite(buffer, transform,
                              ground_chunk->sprite, hm_v4(1, 1, 1, 1));
 
             HM_BBox2 bbox = hm_bbox2_min_size(
@@ -513,7 +517,7 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
             {
                 HM_Transform2 inv_transform = hm_transform2_invert(transform);
                 f32 thickness = 2.0f * hm_get_transform2_scale(inv_transform).x;
-                hm_render_bbox2_outline(gamestate->buffer, transform,
+                hm_render_bbox2_outline(buffer, transform,
                                         bbox, thickness, hm_v4(1, 1, 1, 1));
             }
 #endif
@@ -532,7 +536,7 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
             HM_Transform2 transform = world_to_screen_transform;
             HM_Transform2 inv_transform = hm_transform2_invert(transform);
             f32 thickness = 2.0f * hm_get_transform2_scale(inv_transform).x;
-            hm_render_bbox2_outline(gamestate->buffer, transform, space->bbox,
+            hm_render_bbox2_outline(buffer, transform, space->bbox,
                                     thickness, hm_v4(0, 0, 1, 1));
         }
     }
@@ -542,10 +546,12 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
         /*transform = hm_transform2_rotate_by(gamestate->time, transform);*/
         transform = hm_transform2_translate_by(gamestate->world.hero->pos, transform);
         transform = hm_transform2_dot(world_to_screen_transform, transform);
-        hm_render_sprite(gamestate->buffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
+        hm_render_sprite(buffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
     }
 
-    hm_present_render_commands(gamestate->buffer, framebuffer);
+    hm_present_render_commands(buffer, framebuffer);
+
+    hm_end_tmp_memory(render_memory);
 
     HM_DEBUG_END_BLOCK("update_and_render");
 }
