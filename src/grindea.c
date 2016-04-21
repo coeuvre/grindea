@@ -1,6 +1,7 @@
 #include "hammer/hammer.h"
 
 #include "camera.c"
+#include "polygon.c"
 
 #define WINDOW_WIDTH 967
 #define WINDOW_HEIGHT 547
@@ -162,6 +163,9 @@ typedef struct {
 
     u32 loaded_ground_chunk_count;
     GroundChunk *loaded_ground_chunks;
+
+    PolygonPool *polygon_pool;
+    EditingPolygon *polygon;
 } GameState;
 
 static HM_INIT(init) {
@@ -243,6 +247,14 @@ static HM_INIT(init) {
     }
 
     gamestate->world.hero = add_hero(&gamestate->world, hm_v2(1, 1));
+
+    gamestate->polygon_pool = make_polygon_pool(&memory->perm, HM_MEMORY_SIZE_MB(1));
+    gamestate->polygon = make_polygon(&memory->perm);
+    push_vertex(gamestate->polygon_pool, gamestate->polygon, 10, 10);
+    push_vertex(gamestate->polygon_pool, gamestate->polygon, 50, 50);
+    push_vertex(gamestate->polygon_pool, gamestate->polygon, 100, 10);
+    push_vertex(gamestate->polygon_pool, gamestate->polygon, 50, 100);
+    push_vertex(gamestate->polygon_pool, gamestate->polygon, 10, 100);
 }
 
 static void
@@ -469,6 +481,8 @@ static HM_UPDATE(update) {
     update_active_world_chunks(&gamestate->world, &gamestate->camera,
                                gamestate->loaded_ground_chunk_count,
                                gamestate->loaded_ground_chunks);
+
+    update_polygon(gamestate->polygon, gamestate->polygon_pool);
 }
 
 static HM_RENDER(render) {
@@ -552,6 +566,8 @@ static HM_RENDER(render) {
         transform = hm_transform2_dot(world_to_screen_transform, transform);
         hm_render_sprite(buffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
     }
+
+    render_polygon(gamestate->polygon, buffer);
 
     hm_present_render_commands(buffer, framebuffer);
 
