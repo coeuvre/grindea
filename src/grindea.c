@@ -164,7 +164,7 @@ typedef struct {
     GroundChunk *loaded_ground_chunks;
 } GameState;
 
-static HM_INIT_GAME(init_game) {
+static HM_INIT(init) {
     HM_Memory *memory = hammer->memory;
 
     GameState *gamestate = HM_PUSH_STRUCT(&memory->perm, GameState);
@@ -383,9 +383,7 @@ update_active_world_chunks(World *world, Camera *camera,
     }
 }
 
-static HM_UPDATE_AND_RENDER(update_and_render) {
-    HM_DEBUG_BEGIN_BLOCK("update_and_render");
-
+static HM_UPDATE(update) {
     HM_Memory *memory = hammer->memory;
     HM_Input *input = hammer->input;
     HM_Texture2 *framebuffer = hammer->framebuffer;
@@ -471,10 +469,16 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
     update_active_world_chunks(&gamestate->world, &gamestate->camera,
                                gamestate->loaded_ground_chunk_count,
                                gamestate->loaded_ground_chunks);
+}
 
-    //
-    // Render
-    //
+static HM_RENDER(render) {
+    HM_Memory *memory = hammer->memory;
+    HM_Texture2 *framebuffer = hammer->framebuffer;
+
+    GameState *gamestate = (GameState *)memory->perm.base;
+
+    HM_DEBUG_BEGIN_BLOCK("render");
+
     hm_clear_texture(framebuffer, hm_v4(0.5f, 0.5f, 0.5f, 0));
 
     HM_Transform2 world_to_screen_transform = hm_transform2_dot(
@@ -553,7 +557,7 @@ static HM_UPDATE_AND_RENDER(update_and_render) {
 
     hm_end_tmp_memory(render_memory);
 
-    HM_DEBUG_END_BLOCK("update_and_render");
+    HM_DEBUG_END_BLOCK("render");
 }
 
 int main(void) {
@@ -564,8 +568,9 @@ int main(void) {
     config.memory.size.perm = HM_MEMORY_SIZE_MB(64);
     config.memory.size.tran = HM_MEMORY_SIZE_MB(128);
     config.debug.is_exit_on_esc = true;
-    config.callback.init_game = init_game;
-    config.callback.update_and_render = update_and_render;
+    config.callback.init = init;
+    config.callback.update = update;
+    config.callback.render = render;
 
     hm_run(&config);
 }
