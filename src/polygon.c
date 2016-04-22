@@ -42,36 +42,8 @@ make_polygon(HM_MemoryArena *arena) {
     return result;
 }
 
-static void
-push_vertex(PolygonPool *pool, EditingPolygon *polygon, f32 x, f32 y) {
-    Vertex *vertex = HM_PUSH_STRUCT(&pool->arena, Vertex);
-
-    vertex->pos.x = x;
-    vertex->pos.y = y;
-
-    if (polygon->first) {
-        polygon->first->prev = vertex;
-    } else {
-        polygon->first = vertex;
-    }
-
-    vertex->next = polygon->first;
-
-    vertex->prev = polygon->last;
-
-    if (polygon->last) {
-        polygon->last->next = vertex;
-    } else {
-        polygon->last = vertex;
-    }
-
-    polygon->last = vertex;
-
-    ++polygon->vertex_count;
-}
-
 static Vertex *
-push_after(PolygonPool *pool, EditingPolygon *polygon, Vertex *vertex, HM_V2 pos) {
+push_vertex_after(PolygonPool *pool, EditingPolygon *polygon, Vertex *vertex, HM_V2 pos) {
     Vertex *result = HM_PUSH_STRUCT(&pool->arena, Vertex);
     result->pos = pos;
 
@@ -86,6 +58,27 @@ push_after(PolygonPool *pool, EditingPolygon *polygon, Vertex *vertex, HM_V2 pos
     return result;
 }
 
+
+static void
+push_vertex(PolygonPool *pool, EditingPolygon *polygon, HM_V2 pos) {
+    if (polygon->last) {
+        push_vertex_after(pool, polygon, polygon->last, pos);
+    } else {
+        // The first one
+        Vertex *vertex = HM_PUSH_STRUCT(&pool->arena, Vertex);
+
+        vertex->pos = pos;
+
+        polygon->first = vertex;
+        polygon->last = vertex;
+
+        vertex->next = polygon->first;
+        vertex->prev = polygon->last;
+
+        ++polygon->vertex_count;
+    }
+}
+
 static void
 update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
     HM_Input *input = hammer->input;
@@ -98,8 +91,8 @@ update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
     }
 
     if (polygon->is_dragging) {
-        polygon->selected->pos = mouse_pos;
         polygon->drag_pos = mouse_pos;
+        polygon->selected->pos = polygon->drag_pos;
     } else {
         // Check if the mouse have been moved
         if (input->mouse.is_moved) {
@@ -179,7 +172,9 @@ update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
             if (hm_is_bbox2_contains_point(bbox, mouse_pos)) {
 #if 1
                 if (!hm_is_v2_equal(polygon->selected->pos, polygon->drag_pos)) {
-                    polygon->selected = push_after(pool, polygon, polygon->selected, polygon->drag_pos);
+                    polygon->selected = push_vertex_after(pool, polygon,
+                                                          polygon->selected,
+                                                          polygon->drag_pos);
                 }
 #endif
                 polygon->is_dragging = true;

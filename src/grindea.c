@@ -250,11 +250,11 @@ static HM_INIT(init) {
 
     gamestate->polygon_pool = make_polygon_pool(&memory->perm, HM_MEMORY_SIZE_MB(1));
     gamestate->polygon = make_polygon(&memory->perm);
-    push_vertex(gamestate->polygon_pool, gamestate->polygon, 10, 10);
-    push_vertex(gamestate->polygon_pool, gamestate->polygon, 50, 50);
-    push_vertex(gamestate->polygon_pool, gamestate->polygon, 100, 10);
-    push_vertex(gamestate->polygon_pool, gamestate->polygon, 50, 100);
-    push_vertex(gamestate->polygon_pool, gamestate->polygon, 10, 100);
+    push_vertex(gamestate->polygon_pool, gamestate->polygon, hm_v2(10, 10));
+    push_vertex(gamestate->polygon_pool, gamestate->polygon, hm_v2(50, 50));
+    push_vertex(gamestate->polygon_pool, gamestate->polygon, hm_v2(100, 10));
+    push_vertex(gamestate->polygon_pool, gamestate->polygon, hm_v2(50, 100));
+    push_vertex(gamestate->polygon_pool, gamestate->polygon, hm_v2(10, 100));
 }
 
 static void
