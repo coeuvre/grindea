@@ -495,7 +495,7 @@ static HM_RENDER(render) {
 
     hm_clear_texture(framebuffer, hm_v4(0.5f, 0.5f, 0.5f, 0));
 
-    HM_Transform2 world_to_screen_transform = hm_transform2_dot(
+    HM_Trans2 world_to_screen_transform = hm_trans2_dot(
         camera_space_to_screen_space(&gamestate->camera,
                                      0, framebuffer->width,
                                      0, framebuffer->height),
@@ -519,10 +519,10 @@ static HM_RENDER(render) {
             HM_V2 pos = hm_v2(ground_chunk->x * world->ground_chunk_size.w,
                               ground_chunk->y * world->ground_chunk_size.h);
 
-            HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
-            transform = hm_transform2_translate_by(pos, transform);
-            transform = hm_transform2_dot(world_to_screen_transform, transform);
-            hm_render_sprite(buffer, transform,
+            HM_Trans2 trans = pixel_space_to_world_space(PIXELS_TO_METERS);
+            trans = hm_trans2_translate_by(pos, trans);
+            trans = hm_trans2_dot(world_to_screen_transform, trans);
+            hm_render_sprite(buffer, trans,
                              ground_chunk->sprite, hm_v4(1, 1, 1, 1));
 
             HM_BBox2 bbox = hm_bbox2_min_size(
@@ -533,9 +533,9 @@ static HM_RENDER(render) {
 #if 1
             // Render ground chunk outline
             {
-                HM_Transform2 inv_transform = hm_transform2_invert(transform);
-                f32 thickness = 2.0f * hm_get_transform2_scale(inv_transform).x;
-                hm_render_bbox2_outline(buffer, transform,
+                HM_Trans2 inv_transform = hm_trans2_invert(trans);
+                f32 thickness = 2.0f * hm_get_trans2_scale(inv_transform).x;
+                hm_render_bbox2_outline(buffer, trans,
                                         bbox, thickness, hm_v4(1, 1, 1, 1));
             }
 #endif
@@ -551,20 +551,20 @@ static HM_RENDER(render) {
             // TODO: Support other space types
             HM_ASSERT(space->type == SpaceType_BBox);
 
-            HM_Transform2 transform = world_to_screen_transform;
-            HM_Transform2 inv_transform = hm_transform2_invert(transform);
-            f32 thickness = 2.0f * hm_get_transform2_scale(inv_transform).x;
-            hm_render_bbox2_outline(buffer, transform, space->bbox,
+            HM_Trans2 trans = world_to_screen_transform;
+            HM_Trans2 inv_transform = hm_trans2_invert(trans);
+            f32 thickness = 2.0f * hm_get_trans2_scale(inv_transform).x;
+            hm_render_bbox2_outline(buffer, trans, space->bbox,
                                     thickness, hm_v4(0, 0, 1, 1));
         }
     }
 
     {
-        HM_Transform2 transform = pixel_space_to_world_space(PIXELS_TO_METERS);
-        /*transform = hm_transform2_rotate_by(gamestate->time, transform);*/
-        transform = hm_transform2_translate_by(gamestate->world.hero->pos, transform);
-        transform = hm_transform2_dot(world_to_screen_transform, transform);
-        hm_render_sprite(buffer, transform, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
+        HM_Trans2 trans = pixel_space_to_world_space(PIXELS_TO_METERS);
+        /*trans = hm_trans2_rotate_by(gamestate->time, trans);*/
+        trans = hm_trans2_translate_by(gamestate->world.hero->pos, trans);
+        trans = hm_trans2_dot(world_to_screen_transform, trans);
+        hm_render_sprite(buffer, trans, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
     }
 
     render_polygon(gamestate->polygon, buffer);
