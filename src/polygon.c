@@ -11,9 +11,14 @@ typedef struct {
     Vertex *first_free_vertex;
 } PolygonPool;
 
+#define VERTEX_REGION_SIZE 8
+
 typedef struct {
     Vertex *first;
     Vertex *last;
+
+    Vertex *selected;
+    bool is_dragging;
 } EditingPolygon;
 
 static PolygonPool *
@@ -58,9 +63,48 @@ push_vertex(PolygonPool *pool, EditingPolygon *polygon, f32 x, f32 y) {
 }
 
 static void
-update_polygon(EditingPolygon *polygon, PolygonPool *pool) {
-    (void)polygon;
+update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
     (void)pool;
+
+    HM_Input *input = hammer->input;
+    HM_Texture2 *framebuffer = hammer->framebuffer;
+
+    HM_V2 mouse_pos = hm_v2(input->mouse.x, framebuffer->height - input->mouse.y);
+
+    if (!input->mouse.left.is_down) {
+        polygon->is_dragging = false;
+    }
+
+    if (polygon->is_dragging) {
+        polygon->selected->x = mouse_pos.x;
+        polygon->selected->y = mouse_pos.y;
+    } else {
+        // Check if the mouse have been moved
+        if (input->mouse.is_moved) {
+            f32 min_distance = HM_F32_MAX;
+            Vertex *min_vertex = 0;
+            for (Vertex *a = polygon->first; a; a = a->next) {
+                HM_V2 ab = hm_v2_sub(mouse_pos, hm_v2(a->x, a->y));
+
+                f32 distance = hm_get_v2_len_sq(ab);
+                if (distance < min_distance) {
+                    min_distance = distance;
+                    min_vertex = a;
+                }
+            }
+
+            polygon->selected = min_vertex;
+        }
+
+        if (polygon->selected && input->mouse.left.is_pressed) {
+            HM_V2 pos = hm_v2(polygon->selected->x, polygon->selected->y);
+            HM_BBox2 bbox = hm_bbox2_cen_size(pos, hm_v2(VERTEX_REGION_SIZE,
+                                                         VERTEX_REGION_SIZE));
+            if (hm_is_bbox2_contains_point(bbox, mouse_pos)) {
+                polygon->is_dragging = true;
+            }
+        }
+    }
 }
 
 static void
@@ -71,9 +115,23 @@ render_polygon(EditingPolygon *polygon, HM_RenderCommandBuffer *buffer) {
             b = polygon->first;
         }
 
+        HM_V4 color = hm_v4(1.0f, 1.0f, 1.0f, 1.0f);
+
+        if (a == polygon->selected || b == polygon->selected) {
+            color = hm_v4(1.0f, 0.0f, 0.0f, 1.0f);
+        }
+
         hm_render_line2(buffer, hm_transform2_identity(),
                         hm_line2(hm_v2(a->x, a->y), hm_v2(b->x, b->y)),
-                        2.0f,
-                        hm_v4(1.0f, 1.0f, 1.0f, 1.0f));
+                        2.0f, color);
+    }
+
+    if (polygon->selected) {
+        HM_V2 pos = hm_v2(polygon->selected->x, polygon->selected->y);
+
+        hm_render_bbox2(buffer, hm_transform2_identity(),
+                        hm_bbox2_cen_size(pos, hm_v2(VERTEX_REGION_SIZE,
+                                                     VERTEX_REGION_SIZE)),
+                        hm_v4(1.0f, 0.0f, 0.0f, 1.0f));
     }
 }

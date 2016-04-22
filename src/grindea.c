@@ -482,7 +482,7 @@ static HM_UPDATE(update) {
                                gamestate->loaded_ground_chunk_count,
                                gamestate->loaded_ground_chunks);
 
-    update_polygon(gamestate->polygon, gamestate->polygon_pool);
+    update_polygon(gamestate->polygon, gamestate->polygon_pool, hammer);
 }
 
 static HM_RENDER(render) {
