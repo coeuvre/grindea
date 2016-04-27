@@ -184,7 +184,11 @@ update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
 }
 
 static void
-render_polygon(EditingPolygon *polygon, HM_RenderCommandBuffer *buffer) {
+render_polygon(EditingPolygon *polygon, HM_RenderContext *context) {
+    hm_render_push(context);
+
+    hm_set_render_trans2(context, hm_trans2_identity());
+
     HM_V4 selected_color = hm_v4(1.0f, 0.0f, 0.0f, 1.0f);
 
     Vertex *a = polygon->first;
@@ -209,18 +213,20 @@ render_polygon(EditingPolygon *polygon, HM_RenderCommandBuffer *buffer) {
             }
         }
 
-        hm_render_line2(buffer, hm_trans2_identity(), hm_line2(a->pos, b->pos),
-                        2.0f, color);
+        hm_set_render_color(context, color);
+        hm_render_line2(context, hm_line2(a->pos, b->pos), 2.0f);
 
         a = a->next;
         b = b->next;
     }
 
     if (polygon->selected) {
-        hm_render_bbox2(buffer, hm_trans2_identity(),
+        hm_set_render_color(context, selected_color);
+        hm_render_bbox2(context,
                         hm_bbox2_cen_size(polygon->drag_pos,
                                           hm_v2(VERTEX_DRAG_REGION_SIZE,
-                                                VERTEX_DRAG_REGION_SIZE)),
-                        selected_color);
+                                                VERTEX_DRAG_REGION_SIZE)));
     }
+
+    hm_render_pop(context);
 }

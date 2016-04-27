@@ -495,17 +495,20 @@ static HM_RENDER(render) {
 
     hm_clear_texture(framebuffer, hm_v4(0.5f, 0.5f, 0.5f, 0));
 
-    HM_Trans2 world_to_screen_transform = hm_trans2_dot(
+    HM_Trans2 world_to_screen_trans = hm_trans2_dot(
         camera_space_to_screen_space(&gamestate->camera,
                                      0, framebuffer->width,
                                      0, framebuffer->height),
         world_space_to_camera_space(&gamestate->camera)
     );
+    HM_Trans2 pixel_to_world_trans = pixel_space_to_world_space(PIXELS_TO_METERS);
 
-    HM_MemoryArena *render_memory = hm_begin_tmp_memory(&memory->tran);
-    HM_RenderCommandBuffer *buffer =
-        hm_make_render_command_buffer(render_memory, HM_MEMORY_SIZE_MB(1));
+    HM_MemoryArena *render_memory = hm_temporary_memory_begin(&memory->tran);
 
+    HM_RenderContext *context = hm_render_begin(framebuffer, render_memory,
+                                                HM_MEMORY_SIZE_MB(1));
+
+    hm_set_render_trans2(context, world_to_screen_trans);
 
     // Render ground chunk
     {
@@ -515,35 +518,37 @@ static HM_RENDER(render) {
              ground_chunk_index < world->ground_chunk_count;
              ++ground_chunk_index)
         {
+            hm_render_push(context);
+
             GroundChunk *ground_chunk = world->ground_chunks + ground_chunk_index;
             HM_V2 pos = hm_v2(ground_chunk->x * world->ground_chunk_size.w,
                               ground_chunk->y * world->ground_chunk_size.h);
 
-            HM_Trans2 trans = pixel_space_to_world_space(PIXELS_TO_METERS);
-            trans = hm_trans2_translate_by(pos, trans);
-            trans = hm_trans2_dot(world_to_screen_transform, trans);
-            hm_render_sprite(buffer, trans,
-                             ground_chunk->sprite, hm_v4(1, 1, 1, 1));
+            hm_render_translate2_local(context, pos);
+            hm_render_apply_trans2_local(context, pixel_to_world_trans);
+
+            hm_render_sprite(context, ground_chunk->sprite);
 
             HM_BBox2 bbox = hm_bbox2_min_size(
                 hm_v2_zero(),
                 hm_get_bbox2_size(ground_chunk->sprite->bbox)
             );
 
-#if 1
             // Render ground chunk outline
-            {
-                HM_Trans2 inv_transform = hm_trans2_invert(trans);
-                f32 thickness = 2.0f * hm_get_trans2_scale(inv_transform).x;
-                hm_render_bbox2_outline(buffer, trans,
-                                        bbox, thickness, hm_v4(1, 1, 1, 1));
-            }
-#endif
+            HM_Trans2 inv_trans = hm_trans2_invert(hm_get_render_trans2(context));
+            f32 thickness = 2.0f * hm_get_trans2_scale(inv_trans).x;
+            hm_render_bbox2_outline(context, bbox, thickness);
+
+            hm_render_pop(context);
         }
     }
 
     // Render spaces
     {
+        hm_render_push(context);
+
+        hm_set_render_color(context, hm_v4(0, 0, 1, 1));
+
         World *world = &gamestate->world;
         for (u32 space_index = 0; space_index < world->space_count; ++space_index) {
             Space *space = world->spaces + space_index;
@@ -551,27 +556,31 @@ static HM_RENDER(render) {
             // TODO: Support other space types
             HM_ASSERT(space->type == SpaceType_BBox);
 
-            HM_Trans2 trans = world_to_screen_transform;
-            HM_Trans2 inv_transform = hm_trans2_invert(trans);
-            f32 thickness = 2.0f * hm_get_trans2_scale(inv_transform).x;
-            hm_render_bbox2_outline(buffer, trans, space->bbox,
-                                    thickness, hm_v4(0, 0, 1, 1));
+            HM_Trans2 inv_trans = hm_trans2_invert(hm_get_render_trans2(context));
+            f32 thickness = 2.0f * hm_get_trans2_scale(inv_trans).x;
+            hm_render_bbox2_outline(context, space->bbox, thickness);
         }
+
+        hm_render_pop(context);
     }
 
+    // Render hero
     {
-        HM_Trans2 trans = pixel_space_to_world_space(PIXELS_TO_METERS);
-        /*trans = hm_trans2_rotate_by(gamestate->time, trans);*/
-        trans = hm_trans2_translate_by(gamestate->world.hero->pos, trans);
-        trans = hm_trans2_dot(world_to_screen_transform, trans);
-        hm_render_sprite(buffer, trans, gamestate->hero_sprites.idles[gamestate->hero_direction], hm_v4(1, 1, 1, 1));
+        hm_render_push(context);
+
+        hm_render_translate2_local(context, gamestate->world.hero->pos);
+        hm_render_apply_trans2_local(context, pixel_to_world_trans);
+
+        hm_render_sprite(context, gamestate->hero_sprites.idles[gamestate->hero_direction]);
+
+        hm_render_pop(context);
     }
 
-    render_polygon(gamestate->polygon, buffer);
+    render_polygon(gamestate->polygon, context);
 
-    hm_present_render_commands(buffer, framebuffer);
+    hm_render_end(context);
 
-    hm_end_tmp_memory(render_memory);
+    hm_temporary_memory_end(render_memory);
 
     HM_DEBUG_END_BLOCK("render");
 }
