@@ -79,6 +79,26 @@ push_vertex(PolygonPool *pool, EditingPolygon *polygon, HM_V2 pos) {
     }
 }
 
+static bool
+is_diagonal(EditingPolygon *polygon, Vertex *s1, Vertex *s2) {
+    HM_Line2 test = hm_line2(s1->pos, s2->pos);
+    Vertex *a = polygon->first;
+    for (u32 i = 0; i < polygon->vertex_count; ++i) {
+        Vertex *b = a->next;
+
+        if (a != s1 && a != s2 && b != s1 && b != s2 &&
+            hm_is_line2_intersect(hm_line2(a->pos, b->pos), test))
+        {
+            return false;
+        }
+
+        a = a->next;
+    }
+
+    return true;
+}
+
+
 static void
 update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
     HM_Input *input = hammer->input;
@@ -170,13 +190,13 @@ update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
             );
 
             if (hm_is_bbox2_contains_point(bbox, mouse_pos)) {
-#if 1
+                // Add new vertex at drag point
                 if (!hm_is_v2_equal(polygon->selected->pos, polygon->drag_pos)) {
                     polygon->selected = push_vertex_after(pool, polygon,
                                                           polygon->selected,
                                                           polygon->drag_pos);
                 }
-#endif
+
                 polygon->is_dragging = true;
             }
         }
@@ -189,7 +209,7 @@ render_polygon(EditingPolygon *polygon, HM_RenderContext *context) {
 
     hm_set_render_trans2(context, hm_trans2_identity());
 
-    HM_V4 selected_color = hm_v4(1.0f, 0.0f, 0.0f, 1.0f);
+    HM_V4 selected_color = hm_v4(0.0f, 1.0f, 0.0f, 1.0f);
 
     Vertex *a = polygon->first;
     Vertex *b = a->next;
@@ -226,6 +246,24 @@ render_polygon(EditingPolygon *polygon, HM_RenderContext *context) {
                         hm_bbox2_cen_size(polygon->drag_pos,
                                           hm_v2(VERTEX_DRAG_REGION_SIZE,
                                                 VERTEX_DRAG_REGION_SIZE)));
+    }
+
+    // Draw diagonal
+    {
+        hm_set_render_color(context, hm_v4(0.5f, 0.5f, 0.5f, 1.0f));
+
+        a = polygon->first;
+        for (u32 i = 0; i < polygon->vertex_count; ++i) {
+            b = a->next->next;
+            for (u32 j = 3; j < polygon->vertex_count; ++j) {
+                if (is_diagonal(polygon, a, b)) {
+                    hm_render_line2(context, hm_line2(a->pos, b->pos), 2.0f);
+                }
+                b = b->next;
+            }
+
+            a = a->next;
+        }
     }
 
     hm_render_pop(context);

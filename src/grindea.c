@@ -204,7 +204,7 @@ static HM_INIT(init) {
     space_bbox.max.x *= 2.0f;
     add_bbox_space(&gamestate->world, space_bbox);
 
-    // Manually load ground chunks
+    // Manually set ground chunks
     {
         i32 ground_width_in_pixels = gamestate->background->width;
         i32 ground_height_in_pixels = gamestate->background->height;
@@ -277,7 +277,6 @@ move_entity(World *world, Entity *entity, f32 dt) {
         entity->vel.y = 0.0f;
     }
 
-    // TODO: More iterations to do collision dections
     for (i32 i = 0;
          i < PHYSICS_ITERATION_COUNT && hm_get_v2_len_sq(movement) > 0.0f;
          ++i)
@@ -495,12 +494,6 @@ static HM_RENDER(render) {
 
     hm_clear_texture(framebuffer, hm_v4(0.5f, 0.5f, 0.5f, 0));
 
-    HM_Trans2 world_to_screen_trans = hm_trans2_dot(
-        camera_space_to_screen_space(&gamestate->camera,
-                                     0, framebuffer->width,
-                                     0, framebuffer->height),
-        world_space_to_camera_space(&gamestate->camera)
-    );
     HM_Trans2 pixel_to_world_trans = pixel_space_to_world_space(PIXELS_TO_METERS);
 
     HM_MemoryArena *render_memory = hm_temporary_memory_begin(&memory->tran);
@@ -508,7 +501,17 @@ static HM_RENDER(render) {
     HM_RenderContext *context = hm_render_begin(framebuffer, render_memory,
                                                 HM_MEMORY_SIZE_MB(1));
 
-    hm_set_render_trans2(context, world_to_screen_trans);
+    hm_render_apply_trans2(
+        context,
+        world_space_to_camera_space(&gamestate->camera)
+    );
+
+    hm_render_apply_trans2(
+        context,
+        camera_space_to_screen_space(&gamestate->camera,
+                                     0, framebuffer->width,
+                                     0, framebuffer->height)
+    );
 
     // Render ground chunk
     {
