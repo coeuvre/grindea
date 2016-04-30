@@ -53,6 +53,7 @@ push_vertex_after(PolygonPool *pool, EditingPolygon *polygon, Vertex *vertex, HM
     result->prev = vertex;
     result->prev->next = result;
 
+    polygon->last = polygon->first->prev;
     ++polygon->vertex_count;
 
     return result;
@@ -80,7 +81,7 @@ push_vertex(PolygonPool *pool, EditingPolygon *polygon, HM_V2 pos) {
 }
 
 static bool
-is_diagonal(EditingPolygon *polygon, Vertex *s1, Vertex *s2) {
+is_diagonalie(EditingPolygon *polygon, Vertex *s1, Vertex *s2) {
     HM_Line2 test = hm_line2(s1->pos, s2->pos);
     Vertex *a = polygon->first;
     for (u32 i = 0; i < polygon->vertex_count; ++i) {
@@ -96,6 +97,33 @@ is_diagonal(EditingPolygon *polygon, Vertex *s1, Vertex *s2) {
     }
 
     return true;
+}
+
+static bool
+is_in_cone(EditingPolygon *polygon, Vertex *a, Vertex *b) {
+    (void)polygon;
+
+    Vertex *a0 = a->prev;
+    Vertex *a1 = a->next;
+
+    if (hm_is_line2_left_on(hm_line2(a->pos, a1->pos), a0->pos)) {
+        // convex vertex
+        return (hm_is_line2_left(hm_line2(a->pos, b->pos), a0->pos) &&
+                hm_is_line2_left(hm_line2(b->pos, a->pos), a1->pos));
+    } else {
+        // reflex vertex
+        return !(hm_is_line2_left_on(hm_line2(a->pos, b->pos), a1->pos) &&
+                 hm_is_line2_left_on(hm_line2(b->pos, a->pos), a0->pos));
+    }
+}
+
+static bool
+is_diagonal(EditingPolygon *polygon, Vertex *a, Vertex *b) {
+    bool result = (is_in_cone(polygon, a, b) &&
+                   is_in_cone(polygon, b, a) &&
+                   is_diagonalie(polygon, a, b));
+
+    return result;
 }
 
 
