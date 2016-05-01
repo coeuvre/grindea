@@ -16,8 +16,7 @@ typedef struct {
 
 typedef struct {
     u32 vertex_count;
-    Vertex *first;
-    Vertex *last;
+    Vertex first;
 
     Vertex *selected;
     HM_V2 drag_pos;
@@ -39,21 +38,23 @@ make_polygon(HM_MemoryArena *arena) {
     EditingPolygon *result = HM_PUSH_STRUCT(arena, EditingPolygon);
     HM_CLEAR_MEMORY(result);
 
+    result->first.prev = &result->first;
+    result->first.next = &result->first;
+
     return result;
 }
 
 static Vertex *
-push_vertex_after(PolygonPool *pool, EditingPolygon *polygon, Vertex *vertex, HM_V2 pos) {
+insert_vertex_after(PolygonPool *pool, EditingPolygon *polygon, Vertex *vertex, HM_V2 pos) {
     Vertex *result = HM_PUSH_STRUCT(&pool->arena, Vertex);
     result->pos = pos;
 
+    result->prev = vertex;
     result->next = vertex->next;
+
+    result->prev->next = result;
     result->next->prev = result;
 
-    result->prev = vertex;
-    result->prev->next = result;
-
-    polygon->last = polygon->first->prev;
     ++polygon->vertex_count;
 
     return result;
@@ -62,20 +63,10 @@ push_vertex_after(PolygonPool *pool, EditingPolygon *polygon, Vertex *vertex, HM
 
 static void
 push_vertex(PolygonPool *pool, EditingPolygon *polygon, HM_V2 pos) {
-    if (polygon->last) {
-        push_vertex_after(pool, polygon, polygon->last, pos);
+    if (polygon->vertex_count) {
+        insert_vertex_after(pool, polygon, polygon->first.prev, pos);
     } else {
-        // The first one
-        Vertex *vertex = HM_PUSH_STRUCT(&pool->arena, Vertex);
-
-        vertex->pos = pos;
-
-        polygon->first = vertex;
-        polygon->last = vertex;
-
-        vertex->next = polygon->first;
-        vertex->prev = polygon->last;
-
+        polygon->first.pos = pos;
         ++polygon->vertex_count;
     }
 }
@@ -83,7 +74,7 @@ push_vertex(PolygonPool *pool, EditingPolygon *polygon, HM_V2 pos) {
 static bool
 is_diagonalie(EditingPolygon *polygon, Vertex *s1, Vertex *s2) {
     HM_Line2 test = hm_line2(s1->pos, s2->pos);
-    Vertex *a = polygon->first;
+    Vertex *a = &polygon->first;
     for (u32 i = 0; i < polygon->vertex_count; ++i) {
         Vertex *b = a->next;
 
@@ -147,9 +138,11 @@ update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
             // Find closest vertex
             f32 min_distance = HM_F32_MAX;
             Vertex *min_vertex = 0;
-            Vertex *a = polygon->first;
-            Vertex *b = a->next;
+
+            Vertex *a = &polygon->first;
             for (u32 i = 0; i < polygon->vertex_count; ++i) {
+                Vertex *b = a->next;
+
                 HM_V2 ac = hm_v2_sub(mouse_pos, a->pos);
                 f32 distance = hm_get_v2_len(ac);
 
@@ -165,7 +158,6 @@ update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
                 }
 
                 a = a->next;
-                b = b->next;
             }
 
             // Move drag point along edge
@@ -186,10 +178,7 @@ update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
 
                         f32 proj = hm_get_line2_proj_p(hm_line2(a->pos, b->pos), mouse_pos);
                         if (proj >= 0.0f && proj < 1.0f) {
-                            polygon->drag_pos = hm_v2_add(
-                                a->pos,
-                                hm_v2_mul(proj, hm_v2_sub(b->pos, a->pos))
-                            );
+                            polygon->drag_pos = hm_v2_add(a->pos, hm_v2_mul(proj, hm_v2_sub(b->pos, a->pos)));
                         }
                     }
 
@@ -199,7 +188,7 @@ update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
             }
 
             // Snap drag point to vertex
-            a = polygon->first;
+            a = &polygon->first;
             for (u32 i = 0; i < polygon->vertex_count; ++i) {
                 f32 distance = hm_get_v2_len(hm_v2_sub(polygon->drag_pos, a->pos));
                 if (distance < VERTEX_THRESHOLD) {
@@ -220,9 +209,9 @@ update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
             if (hm_is_bbox2_contains_point(bbox, mouse_pos)) {
                 // Add new vertex at drag point
                 if (!hm_is_v2_equal(polygon->selected->pos, polygon->drag_pos)) {
-                    polygon->selected = push_vertex_after(pool, polygon,
-                                                          polygon->selected,
-                                                          polygon->drag_pos);
+                    polygon->selected = insert_vertex_after(pool, polygon,
+                                                            polygon->selected,
+                                                            polygon->drag_pos);
                 }
 
                 polygon->is_dragging = true;
@@ -239,9 +228,10 @@ render_polygon(EditingPolygon *polygon, HM_RenderContext *context) {
 
     HM_V4 selected_color = hm_v4(0.0f, 1.0f, 0.0f, 1.0f);
 
-    Vertex *a = polygon->first;
-    Vertex *b = a->next;
+    Vertex *a = &polygon->first;
     for (u32 i = 0; i < polygon->vertex_count; ++i) {
+        Vertex *b = a->next;
+
         HM_V4 color = hm_v4(1.0f, 1.0f, 1.0f, 1.0f);
 
         if (hm_is_v2_equal(a->pos, polygon->drag_pos) ||
@@ -265,7 +255,6 @@ render_polygon(EditingPolygon *polygon, HM_RenderContext *context) {
         hm_render_line2(context, hm_line2(a->pos, b->pos), 2.0f);
 
         a = a->next;
-        b = b->next;
     }
 
     if (polygon->selected) {
@@ -280,16 +269,15 @@ render_polygon(EditingPolygon *polygon, HM_RenderContext *context) {
     {
         hm_set_render_color(context, hm_v4(0.5f, 0.5f, 0.5f, 1.0f));
 
-        a = polygon->first;
+        Vertex *a = &polygon->first;
         for (u32 i = 0; i < polygon->vertex_count; ++i) {
-            b = a->next->next;
+            Vertex *b = a->next->next;
             for (u32 j = 3; j < polygon->vertex_count; ++j) {
                 if (is_diagonal(polygon, a, b)) {
                     hm_render_line2(context, hm_line2(a->pos, b->pos), 2.0f);
                 }
                 b = b->next;
             }
-
             a = a->next;
         }
     }
