@@ -102,17 +102,16 @@ push_vertex(PolygonPool *pool, EditingPolygon *polygon, HM_V2 pos) {
 }
 
 static void
-remove_vertex(PolygonPool *pool, EditingPolygon *polygon, Vertex *vertex) {
-    Vertex *freed;
-    if (polygon->vertex_count > 1) {
-        freed = vertex;
-        freed->next->prev = freed->prev;
-        freed->prev->next = freed->next;
-        polygon->first = freed->next;
-        freed->prev = freed->next = 0;
-    } else {
-        freed = polygon->first;
-        polygon->first = 0;
+remove_vertex(PolygonPool *pool, EditingPolygon *polygon, Vertex *freed) {
+    freed->next->prev = freed->prev;
+    freed->prev->next = freed->next;
+
+    if (freed == polygon->first) {
+        if (polygon->vertex_count > 1) {
+            polygon->first = freed->next;
+        } else {
+            polygon->first = 0;
+        }
     }
 
     freed->next = pool->first_free_vertex;
