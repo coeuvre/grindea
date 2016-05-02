@@ -255,6 +255,7 @@ static HM_INIT(init) {
     push_vertex(gamestate->polygon_pool, gamestate->polygon, hm_v2(100, 10));
     push_vertex(gamestate->polygon_pool, gamestate->polygon, hm_v2(50, 100));
     push_vertex(gamestate->polygon_pool, gamestate->polygon, hm_v2(10, 100));
+    close_polygon(gamestate->polygon);
 }
 
 static void
