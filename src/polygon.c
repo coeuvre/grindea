@@ -38,18 +38,20 @@ static TriangulatedPolygon *triangulated_polygon;
 
 static PolygonPool *
 make_polygon_pool(HM_MemoryArena *arena, usize size) {
-    PolygonPool *result = HM_PUSH_STRUCT(arena, PolygonPool);
-    HM_CLEAR_MEMORY(result);
+    PolygonPool *result = hm_push_struct(arena, PolygonPool);
 
-    result->arena = HM_SUB_MEMORY_ARENA(arena, size);
+    hm_clear_memory(result);
+
+    result->arena = hm_sub_memory_arena(arena, size);
 
     return result;
 }
 
 static EditingPolygon *
 make_polygon(HM_MemoryArena *arena) {
-    EditingPolygon *result = HM_PUSH_STRUCT(arena, EditingPolygon);
-    HM_CLEAR_MEMORY(result);
+    EditingPolygon *result = hm_push_struct(arena, EditingPolygon);
+
+    hm_clear_memory(result);
 
     return result;
 }
@@ -65,7 +67,7 @@ get_free_or_alloc_vertex(PolygonPool *pool) {
     if (result) {
         pool->first_free_vertex = result->next;
     } else {
-        result = HM_PUSH_STRUCT(&pool->arena, Vertex);
+        result = hm_push_struct(&pool->arena, Vertex);
     }
 
     return result;
@@ -129,7 +131,7 @@ copy_polygon(PolygonPool *pool, EditingPolygon *polygon) {
     EditingPolygon *result = pool->first_free_editing_polygon;
     if (result) {
         pool->first_free_editing_polygon = result->next;
-        HM_CLEAR_MEMORY(result);
+        hm_clear_memory(result);
     } else {
         result = make_polygon(&pool->arena);
     }
@@ -216,10 +218,10 @@ init_polygon_ear(EditingPolygon *polygon) {
 
 static TriangulatedPolygon *
 triangulate_polygon(PolygonPool *pool, EditingPolygon *polygon) {
-    TriangulatedPolygon *result = HM_PUSH_STRUCT(&pool->arena, TriangulatedPolygon);
+    TriangulatedPolygon *result = hm_push_struct(&pool->arena, TriangulatedPolygon);
 
     result->triangle_count = 0;
-    result->triangles = HM_PUSH_ARRAY(&pool->arena, HM_Triangle2, polygon->vertex_count - 2);
+    result->triangles = hm_push_array(&pool->arena, HM_Triangle2, polygon->vertex_count - 2);
 
     init_polygon_ear(polygon);
     while (polygon->vertex_count > 3) {

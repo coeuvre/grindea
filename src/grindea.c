@@ -171,7 +171,9 @@ typedef struct {
 static HM_INIT(init) {
     HM_Memory *memory = hammer->memory;
 
-    GameState *gamestate = HM_PUSH_STRUCT(&memory->perm, GameState);
+    GameState *gamestate = hm_push_struct(&memory->perm, GameState);
+
+    hm_clear_memory(gamestate);
 
     gamestate->test_texture = hm_load_bitmap(&memory->tran, "assets/test.bmp");
 
@@ -222,9 +224,8 @@ static HM_INIT(init) {
 
         gamestate->loaded_ground_chunk_count = ground_chunk_count_x *
                                                ground_chunk_count_y;
-        gamestate->loaded_ground_chunks =
-            HM_PUSH_ARRAY(&memory->tran, GroundChunk,
-                          gamestate->loaded_ground_chunk_count);
+        gamestate->loaded_ground_chunks = hm_push_array(&memory->tran, GroundChunk,
+                                                        gamestate->loaded_ground_chunk_count);
 
         for (i32 y = 0; y < ground_chunk_count_y; ++y) {
             for (i32 x = 0; x < ground_chunk_count_x; ++x) {
@@ -248,7 +249,7 @@ static HM_INIT(init) {
 
     gamestate->world.hero = add_hero(&gamestate->world, hm_v2(1, 1));
 
-    gamestate->polygon_pool = make_polygon_pool(&memory->perm, HM_MEMORY_SIZE_MB(1));
+    gamestate->polygon_pool = make_polygon_pool(&memory->perm, HM_MB(1));
     gamestate->polygon = make_polygon(&memory->perm);
     push_vertex(gamestate->polygon_pool, gamestate->polygon, hm_v2(10, 10));
     push_vertex(gamestate->polygon_pool, gamestate->polygon, hm_v2(50, 50));
@@ -500,7 +501,7 @@ static HM_RENDER(render) {
     HM_MemoryArena *render_memory = hm_temporary_memory_begin(&memory->tran);
 
     HM_RenderContext *context = hm_render_begin(framebuffer, render_memory,
-                                                HM_MEMORY_SIZE_MB(1));
+                                                HM_MB(1));
 
     hm_render_apply_trans2(
         context,
@@ -594,8 +595,8 @@ int main(void) {
     config.window.title = "Grindea";
     config.window.width = WINDOW_WIDTH;
     config.window.height = WINDOW_HEIGHT;
-    config.memory.size.perm = HM_MEMORY_SIZE_MB(64);
-    config.memory.size.tran = HM_MEMORY_SIZE_MB(128);
+    config.memory.size.perm = HM_MB(64);
+    config.memory.size.tran = HM_MB(128);
     config.debug.is_exit_on_esc = true;
     config.callback.init = init;
     config.callback.update = update;
