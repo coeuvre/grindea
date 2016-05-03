@@ -156,8 +156,9 @@ free_polygon(PolygonPool *pool, EditingPolygon *polygon) {
 }
 
 static void
-free_triangulated_polygon(PolygonPool *pool, TriangulatedPolygon *triangulated_polygon) {
-    // TODO
+free_triangulated_polygon(TriangulatedPolygon *triangulated_polygon) {
+    hm_free(triangulated_polygon->triangles);
+    hm_free(triangulated_polygon);
 }
 
 static bool
@@ -218,10 +219,10 @@ init_polygon_ear(EditingPolygon *polygon) {
 
 static TriangulatedPolygon *
 triangulate_polygon(PolygonPool *pool, EditingPolygon *polygon) {
-    TriangulatedPolygon *result = hm_push_struct(&pool->arena, TriangulatedPolygon);
+    TriangulatedPolygon *result = hm_alloc_struct(TriangulatedPolygon);
 
     result->triangle_count = 0;
-    result->triangles = hm_push_array(&pool->arena, HM_Triangle2, polygon->vertex_count - 2);
+    result->triangles = hm_alloc_array(HM_Triangle2, polygon->vertex_count - 2);
 
     init_polygon_ear(polygon);
     while (polygon->vertex_count > 3) {
@@ -366,7 +367,7 @@ update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
 
     EditingPolygon *copied = copy_polygon(pool, polygon);
     if (triangulated_polygon != 0) {
-        free_triangulated_polygon(pool, triangulated_polygon);
+        free_triangulated_polygon(triangulated_polygon);
     }
     triangulated_polygon = triangulate_polygon(pool, copied);
     free_polygon(pool, copied);
