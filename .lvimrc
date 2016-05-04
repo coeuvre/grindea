@@ -1,5 +1,10 @@
 let g:coeuvre_project_root = g:localvimrc_script_dir
 
-let &makeprg = g:coeuvre_project_root . '/build.sh'
+if WINDOWS()
+    let &makeprg = g:coeuvre_project_root . '\build'
+    nnoremap <silent> <leader>br :call xolox#misc#os#exec({'command': g:coeuvre_project_root . '\run'})<cr>
+else
+    let &makeprg = g:coeuvre_project_root . '/build.sh'
+    nnoremap <silent> <leader>br :VimuxRunCommand(g:coeuvre_project_root . '/run.sh')<cr>
+endif
 
-nnoremap <silent> <leader>br :VimuxRunCommand(g:coeuvre_project_root . '/run.sh')<cr>

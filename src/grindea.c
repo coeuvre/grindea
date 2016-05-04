@@ -603,5 +603,7 @@ int main(void) {
     config.callback.render = render;
 
     hm_run(&config);
+
+    return 0;
 }
 

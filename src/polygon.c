@@ -372,7 +372,7 @@ update_polygon(EditingPolygon *polygon, PolygonPool *pool, Hammer *hammer) {
     triangulated_polygon = triangulate_polygon(pool, copied);
     free_polygon(pool, copied);
 
-    printf("%lu\n", pool->arena.used);
+    //printf("%lu\n", pool->arena.used);
 }
 
 static void
