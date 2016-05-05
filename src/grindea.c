@@ -286,7 +286,7 @@ move_entity(World *world, Entity *entity, f32 dt) {
         HM_V2 target = hm_v2_add(entity->pos, movement);
 
         f32 limit_t = 0.0f;
-        HM_V2 limit_normal = {};
+        HM_V2 limit_normal = {0};
         bool limited = false;
 
         f32 min_t = 1.0f;
@@ -591,7 +591,7 @@ static HM_RENDER(render) {
 }
 
 int main(void) {
-    HM_Config config = {};
+    HM_Config config = {0};
     config.window.title = "Grindea";
     config.window.width = WINDOW_WIDTH;
     config.window.height = WINDOW_HEIGHT;
