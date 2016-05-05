@@ -590,7 +590,10 @@ static HM_RENDER(render) {
     HM_DEBUG_END_BLOCK("render");
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
+    (void)argc;
+    (void)argv;
+
     HM_Config config = {0};
     config.window.title = "Grindea";
     config.window.width = WINDOW_WIDTH;
@@ -606,4 +609,3 @@ int main(void) {
 
     return 0;
 }
-
