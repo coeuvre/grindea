@@ -127,7 +127,7 @@ static HeroSprites
 load_hero_sprites(HM_Memory *memory) {
     HeroSprites result;
 
-    result.idle_texture = hm_load_bitmap(&memory->perm, "assets/sprites/hero/idle.bmp");
+    result.idle_texture = hm_load_image(&memory->perm, "assets/sprites/hero/idle.bmp");
 
     int sprite_width = 64;
     int sprite_height = 96;
@@ -175,9 +175,9 @@ static HM_INIT(init) {
 
     hm_clear_memory(gamestate);
 
-    gamestate->test_texture = hm_load_bitmap(&memory->tran, "assets/test.bmp");
+    gamestate->test_texture = hm_load_image(&memory->tran, "assets/test.bmp");
 
-    gamestate->background = hm_load_bitmap(&memory->tran, "assets/scene1.bmp");
+    gamestate->background = hm_load_image(&memory->tran, "assets/scene1.bmp");
 
     gamestate->hero_sprites = load_hero_sprites(memory);
 

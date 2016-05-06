@@ -4,6 +4,6 @@ set base=%~dp0
 
 pushd %base%
 
-build && build\grindea.exe
+build && hammer_player build\grindea.dll
 
 popd
