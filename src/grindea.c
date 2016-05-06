@@ -583,29 +583,21 @@ static HM_RENDER(render) {
 
     render_polygon(gamestate->polygon, context);
 
-    hm_render_end(context);
+    hm_render_end(context, &hammer->platform->work_queue);
 
     hm_temporary_memory_end(render_memory);
 
     HM_DEBUG_END_BLOCK("render");
 }
 
-int main(int argc, char *argv[]) {
-    (void)argc;
-    (void)argv;
-
-    HM_Config config = {0};
-    config.window.title = "Grindea";
-    config.window.width = WINDOW_WIDTH;
-    config.window.height = WINDOW_HEIGHT;
-    config.memory.size.perm = HM_MB(64);
-    config.memory.size.tran = HM_MB(128);
-    config.debug.is_exit_on_esc = true;
-    config.callback.init = init;
-    config.callback.update = update;
-    config.callback.render = render;
-
-    hm_run(&config);
-
-    return 0;
+HM_CONFIG_CALLBACK {
+    config->window.title = "Grindea";
+    config->window.width = WINDOW_WIDTH;
+    config->window.height = WINDOW_HEIGHT;
+    config->memory.size.perm = HM_MB(64);
+    config->memory.size.tran = HM_MB(128);
+    config->debug.is_exit_on_esc = true;
+    config->callback.init = init;
+    config->callback.update = update;
+    config->callback.render = render;
 }

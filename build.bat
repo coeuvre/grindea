@@ -11,6 +11,6 @@ if not exist %base%\build mkdir build
 pushd %base%\build
 
 REM Change /subsystem:console to /subsystem:windows to disable console
-%cc% %cflags% %src% /link hammer.lib /subsystem:console
+%cc% %cflags% %src% -LD /link hammer.lib /subsystem:console /export:hm_config_callback /out:game.dll
 
 popd
